@@ -11,13 +11,19 @@ We are going to start with Security groups which are attached to the instance. A
   <img src="./images/sg.png" />
 </p>
 
-Security groups are stateful therfore allwing incoming traffic allows the response.
+Security groups are stateful therfore allowing incoming traffic allows the response.
+
+See more in the documentation: https://docs.aws.amazon.com/vpc/latest/userguide/security-groups.html
 
 ### NACL
 Network Access Control Lists allow you to manage traffic withing your VPC (applied to subnets), they are evaluated before Security groups and are stateless (You need to allow response traffic separately).
 
+See more in the documentation: https://docs.aws.amazon.com/vpc/latest/userguide/vpc-network-acls.html
+
 ### Systems Manager
 Lastly - it is worth to ask ourselves the question if allowing to access the instance via ssh is absolutely necessary. AWS allows you to use session manager for a console access to the server and use IAM to control the accesss to the instances.
+
+See more in the documentation https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html
 
 ## IAM privilige escalation
 ### Discover availible credentials 
